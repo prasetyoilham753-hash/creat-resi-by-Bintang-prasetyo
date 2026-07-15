@@ -466,8 +466,6 @@
   });
 
   btnSelesai.addEventListener('click', () => {
-    // Jika ada data belum ditambahkan tapi sudah diisi, tanyakan lewat validasi ringan:
-    // hanya proses antrean yang sudah ditambahkan lewat "Tambah Resi".
     if(resiQueue.length === 0){
       showError('Belum ada resi di antrean. Klik "Tambah Resi" terlebih dahulu, atau isi minimal satu resi.');
       return;
@@ -484,88 +482,165 @@
     generatePdf([data]);
   });
 
-  // ---- Pembuatan PDF ----
+  // =========================================================
+  // ---- Pembuatan PDF (desain baru: header/footer hitam) ----
+  // =========================================================
+
+  function centerText(doc, text, x1, x2, y){
+    const w = doc.getTextWidth(text);
+    doc.text(text, x1 + (x2 - x1 - w) / 2, y);
+  }
+
+  function dashedLine(doc, x1, y1, x2, y2, dash, gap){
+    doc.setLineDashPattern([dash, gap], 0);
+    doc.line(x1, y1, x2, y2);
+    doc.setLineDashPattern([], 0); // reset ke solid untuk elemen lain
+  }
+
   function drawResiPage(doc, data, isFirstPage){
     if(!isFirstPage){
       doc.addPage([100,150], 'portrait');
     }
-    const marginX = 6;
+
     const pageWidth = 100;
-    const contentWidth = pageWidth - marginX*2;
-    let y = 10;
-
-    // Header
-    doc.setFont('helvetica','bold');
-    doc.setFontSize(12);
+    const marginX = 6;
+    const contentWidth = pageWidth - marginX * 2;
     const labelPembayaran = data.pembayaran === 'cod' ? 'COD' : 'NON COD';
-    doc.text(`J&T EXPRESS ${labelPembayaran}`, marginX, y);
-    y += 3;
-    doc.setLineWidth(0.4);
-    doc.line(marginX, y, pageWidth - marginX, y);
-    y += 6;
 
-    // Penerima
-    doc.setFont('helvetica','bold');
+    // ============ HEADER (pita hitam) ============
+    const headerH = 20;
+    doc.setFillColor(0, 0, 0);
+    doc.rect(0, 0, pageWidth, headerH, 'F');
+
+    doc.setTextColor(255, 255, 255);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(23);
+    doc.text('J&T', marginX, 14);
+
     doc.setFontSize(8.5);
+    doc.text('E X P R E S S', marginX + 24, 12.5);
+
+    // kotak COD / NON COD
+    const boxX2 = pageWidth - marginX;
+    const boxX1 = boxX2 - 26;
+    doc.setDrawColor(255, 255, 255);
+    doc.setLineWidth(0.5);
+    doc.rect(boxX1, 5, 26, 11);
+    doc.setFontSize(11.5);
+    centerText(doc, labelPembayaran, boxX1, boxX2, 12);
+
+    doc.setTextColor(0, 0, 0);
+    doc.setDrawColor(0, 0, 0);
+
+    let y = headerH + 9;
+
+    // ============ PENERIMA ============
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9.5);
+    doc.setTextColor(110, 110, 110);
     doc.text('PENERIMA', marginX, y);
-    y += 4.5;
+    y += 2;
+    doc.setLineWidth(0.3);
+    doc.line(marginX, y, pageWidth - marginX, y);
+    y += 7;
 
-    doc.setFont('helvetica','normal');
-    doc.setFontSize(10);
-    doc.text(data.namaPenerima, marginX, y);
-    y += 4.7;
+    doc.setTextColor(0, 0, 0);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(18);
+    const namaLines = doc.splitTextToSize(data.namaPenerima, contentWidth);
+    doc.text(namaLines, marginX, y);
+    y += namaLines.length * 6.5 + 2;
+
+    doc.setFontSize(13);
     doc.text(data.hpPenerima, marginX, y);
-    y += 4.7;
+    y += 7;
 
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(10);
+    doc.setTextColor(60, 60, 60);
     const alamatLines = doc.splitTextToSize(data.alamatPenerima, contentWidth);
     doc.text(alamatLines, marginX, y);
     y += alamatLines.length * 4.4 + 4;
 
-    // Info fields
-    const fields = [
-      ['LAYANAN', 'Regular'],
-      ['PEMBAYARAN', labelPembayaran === 'COD' ? 'COD' : 'Non COD'],
-      ['TANGGAL', data.tanggal],
-      ['EKSPEDISI', 'J&T'],
-      ['JUMLAH', `${data.jumlah} pcs`]
-    ];
-    fields.forEach(([label, val]) => {
-      doc.setFont('helvetica','bold');
-      doc.setFontSize(8.5);
-      doc.text(label, marginX, y);
-      y += 4.2;
-      doc.setFont('helvetica','normal');
-      doc.setFontSize(10);
-      doc.text(String(val), marginX, y);
-      y += 5.2;
-    });
+    doc.setTextColor(0, 0, 0);
+    dashedLine(doc, marginX, y, pageWidth - marginX, y, 1, 1);
+    y += 6;
 
-    y += 1.5;
-    doc.setLineWidth(0.2);
-    doc.line(marginX, y, pageWidth - marginX, y);
-    y += 5;
+    // ============ FIELDS (2 kolom) ============
+    const colX1 = marginX;
+    const colX2 = 53;
+    const fieldsTop = y;
 
-    // Pengirim
-    doc.setFont('helvetica','bold');
-    doc.setFontSize(8.5);
+    function fieldPair(label1, val1, label2, val2, yy){
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(8);
+      doc.setTextColor(110, 110, 110);
+      doc.text(label1, colX1, yy);
+      doc.text(label2, colX2, yy);
+
+      doc.setFontSize(12);
+      doc.setTextColor(0, 0, 0);
+      doc.text(String(val1), colX1, yy + 6);
+      doc.text(String(val2), colX2, yy + 6);
+    }
+
+    fieldPair('LAYANAN', 'Regular', 'PEMBAYARAN', labelPembayaran, y);
+    y += 13;
+    fieldPair('TANGGAL', data.tanggal, 'EKSPEDISI', 'J&T', y);
+    y += 13;
+
+    // garis titik-titik vertikal pemisah dua kolom di atas
+    dashedLine(doc, colX2 - 3, fieldsTop - 2, colX2 - 3, y - 11, 0.6, 0.8);
+
+    // JUMLAH (baris tunggal, sedikit menjorok)
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8);
+    doc.setTextColor(110, 110, 110);
+    doc.text('JUMLAH', colX1 + 6, y);
+    y += 6.5;
+    doc.setFontSize(15);
+    doc.setTextColor(0, 0, 0);
+    doc.text(`${data.jumlah} pcs`, colX1 + 6, y);
+    y += 6;
+
+    dashedLine(doc, marginX, y, pageWidth - marginX, y, 1, 1);
+    y += 7;
+
+    // ============ PENGIRIM ============
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9.5);
+    doc.setTextColor(110, 110, 110);
     doc.text('PENGIRIM', marginX, y);
-    y += 4.5;
+    y += 2;
+    doc.setLineWidth(0.3);
+    doc.line(marginX, y, pageWidth - marginX, y);
+    y += 7;
 
-    doc.setFont('helvetica','normal');
-    doc.setFontSize(10);
-    doc.text(data.namaPengirim, marginX, y);
-    y += 4.7;
+    doc.setTextColor(0, 0, 0);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(14.5);
+    const namaPengirimLines = doc.splitTextToSize(data.namaPengirim, contentWidth);
+    doc.text(namaPengirimLines, marginX, y);
+    y += namaPengirimLines.length * 5.5 + 2;
+
+    doc.setFontSize(11.5);
     doc.text(data.hpPengirim, marginX, y);
-    y += 4.7;
+    y += 6.5;
 
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8.5);
+    doc.setTextColor(60, 60, 60);
     const alamatPengirimLines = doc.splitTextToSize(data.alamatPengirim, contentWidth);
     doc.text(alamatPengirimLines, marginX, y);
-    y += alamatPengirimLines.length * 4.4;
 
-    // Footer
-    doc.setFont('helvetica','italic');
-    doc.setFontSize(8);
-    doc.text('J&T EXPRESS \u2014 TERIMA KASIH', marginX, 145);
+    // ============ FOOTER (pita hitam) ============
+    const footerH = 11;
+    doc.setFillColor(0, 0, 0);
+    doc.rect(0, 150 - footerH, pageWidth, footerH, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10);
+    centerText(doc, 'J&T EXPRESS  \u2014  TERIMA KASIH', marginX, pageWidth - marginX, 150 - footerH / 2 + 1.3);
   }
 
   function generatePdf(list){
