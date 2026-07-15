@@ -1,0 +1,592 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cetak Resi J&T Express</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+  :root{
+    --ink:#1a2e22;
+    --paper:#f6f3ec;
+    --card:#ffffff;
+    --line:#d8d2c2;
+    --accent:#c1481d;   /* J&T-style burnt orange, used sparingly */
+    --accent-ink:#ffffff;
+    --muted:#6b7368;
+    --mono: "JetBrains Mono", "Courier New", monospace;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--paper);
+    color:var(--ink);
+    font-family:"Inter","Segoe UI",Arial,sans-serif;
+    line-height:1.4;
+  }
+  .wrap{
+    max-width:640px;
+    margin:0 auto;
+    padding:28px 18px 80px;
+  }
+  header{
+    display:flex;
+    align-items:baseline;
+    justify-content:space-between;
+    border-bottom:2px solid var(--ink);
+    padding-bottom:10px;
+    margin-bottom:22px;
+  }
+  header h1{
+    font-size:19px;
+    letter-spacing:0.02em;
+    margin:0;
+    font-weight:700;
+  }
+  header .tag{
+    font-family:var(--mono);
+    font-size:11px;
+    color:var(--muted);
+  }
+  .panel{
+    background:var(--card);
+    border:1px solid var(--line);
+    border-radius:2px;
+    padding:20px;
+    margin-bottom:16px;
+  }
+  .mode-select{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:12px;
+  }
+  .mode-btn{
+    text-align:left;
+    padding:16px;
+    border:1px solid var(--ink);
+    background:var(--card);
+    border-radius:2px;
+    cursor:pointer;
+    font-family:inherit;
+  }
+  .mode-btn:hover{ background:#fbf2ec; border-color:var(--accent); }
+  .mode-btn .num{
+    font-family:var(--mono);
+    font-size:11px;
+    color:var(--accent);
+    display:block;
+    margin-bottom:6px;
+  }
+  .mode-btn .title{ font-weight:700; font-size:14.5px; display:block; margin-bottom:4px;}
+  .mode-btn .desc{ font-size:12px; color:var(--muted);}
+  .hidden{ display:none !important; }
+  label{
+    display:block;
+    font-size:11.5px;
+    font-weight:600;
+    text-transform:uppercase;
+    letter-spacing:0.03em;
+    color:var(--muted);
+    margin:14px 0 5px;
+  }
+  label:first-of-type{ margin-top:0; }
+  input[type="text"], input[type="tel"], textarea, select{
+    width:100%;
+    padding:9px 10px;
+    border:1px solid var(--line);
+    border-radius:2px;
+    font-size:14px;
+    font-family:inherit;
+    background:#fff;
+    color:var(--ink);
+  }
+  input:focus, textarea:focus, select:focus{
+    outline:2px solid var(--accent);
+    outline-offset:1px;
+    border-color:var(--accent);
+  }
+  textarea{ resize:vertical; min-height:60px; }
+  input[readonly]{ background:#f1efe7; color:var(--muted); }
+  .row2{ display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  .divider{
+    border:none;
+    border-top:1px dashed var(--line);
+    margin:20px 0 4px;
+  }
+  .section-label{
+    font-family:var(--mono);
+    font-size:11px;
+    color:var(--accent);
+    letter-spacing:0.05em;
+    margin-top:4px;
+  }
+  .actions{
+    display:flex;
+    gap:10px;
+    margin-top:20px;
+    flex-wrap:wrap;
+  }
+  button.primary{
+    background:var(--ink);
+    color:#fff;
+    border:none;
+    padding:11px 18px;
+    border-radius:2px;
+    font-size:13.5px;
+    font-weight:600;
+    cursor:pointer;
+    font-family:inherit;
+  }
+  button.primary:hover{ background:var(--accent); }
+  button.secondary{
+    background:#fff;
+    color:var(--ink);
+    border:1px solid var(--ink);
+    padding:11px 18px;
+    border-radius:2px;
+    font-size:13.5px;
+    font-weight:600;
+    cursor:pointer;
+    font-family:inherit;
+  }
+  button.secondary:hover{ border-color:var(--accent); color:var(--accent); }
+  button.link{
+    background:none;
+    border:none;
+    color:var(--muted);
+    text-decoration:underline;
+    cursor:pointer;
+    font-size:12.5px;
+    padding:0;
+    font-family:inherit;
+  }
+  #queuePanel{ margin-top:16px; }
+  #queuePanel h2{ font-size:13px; margin:0 0 10px; text-transform:uppercase; letter-spacing:0.03em; color:var(--muted);}
+  .queue-item{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    padding:9px 0;
+    border-bottom:1px solid var(--line);
+    font-size:13.5px;
+  }
+  .queue-item .qname{ font-weight:600; }
+  .queue-item .qmeta{ color:var(--muted); font-size:12px; }
+  .queue-item button{
+    background:none;
+    border:none;
+    color:#a33;
+    cursor:pointer;
+    font-size:12px;
+    text-decoration:underline;
+  }
+  .empty-note{ font-size:12.5px; color:var(--muted); }
+  .error-msg{
+    background:#fbe9e4;
+    border:1px solid #e0a691;
+    color:#8a3418;
+    padding:9px 12px;
+    border-radius:2px;
+    font-size:13px;
+    margin-top:12px;
+  }
+  footer{
+    text-align:center;
+    font-size:11.5px;
+    color:var(--muted);
+    margin-top:36px;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <h1>Cetak Resi J&amp;T Express</h1>
+    <span class="tag">100 &times; 150 mm / PDF</span>
+  </header>
+
+  <!-- MODE SELECTION -->
+  <div class="panel" id="modeSelectPanel">
+    <div class="mode-select">
+      <button class="mode-btn" id="btnPilihManual">
+        <span class="num">Opsi 1</span>
+        <span class="title">Input Manual</span>
+        <span class="desc">Buat satu resi langsung, lalu unduh PDF.</span>
+      </button>
+      <button class="mode-btn" id="btnPilihMassal">
+        <span class="num">Opsi 2</span>
+        <span class="title">Input Massal</span>
+        <span class="desc">Tambahkan beberapa resi berurutan, unduh sekaligus jadi satu PDF.</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- FORM -->
+  <div class="panel hidden" id="formPanel">
+    <button class="link" id="btnGantiMode">&larr; Ganti mode</button>
+
+    <div class="section-label">Penerima</div>
+    <label for="namaPenerima">Nama Penerima</label>
+    <input type="text" id="namaPenerima" placeholder="mis. Yuli / Mitra (Yuli)">
+
+    <label for="hpPenerima">No. HP Penerima</label>
+    <input type="tel" id="hpPenerima" placeholder="mis. 0858-1532-5512">
+
+    <label for="alamatPenerima">Alamat Lengkap</label>
+    <textarea id="alamatPenerima" placeholder="Jalan, RT/RW, kelurahan, kecamatan, kota/kab, provinsi, kode pos"></textarea>
+
+    <div class="row2">
+      <div>
+        <label for="jumlahPesanan">Jumlah Pesanan</label>
+        <select id="jumlahPesanan"></select>
+      </div>
+      <div>
+        <label for="pembayaran">Pembayaran</label>
+        <select id="pembayaran">
+          <option value="cod">COD</option>
+          <option value="nonCod">Non COD</option>
+        </select>
+      </div>
+    </div>
+
+    <hr class="divider">
+    <div class="section-label">Pengirim</div>
+
+    <label for="namaPengirim">Nama Pengirim</label>
+    <input type="text" id="namaPengirim" placeholder="mis. Kapuyuak Island">
+
+    <label for="hpPengirim">No. HP Pengirim (otomatis)</label>
+    <input type="text" id="hpPengirim" readonly>
+
+    <label for="alamatPengirim">Alamat Pengirim (otomatis)</label>
+    <textarea id="alamatPengirim" readonly></textarea>
+
+    <div id="formError" class="error-msg hidden"></div>
+
+    <!-- Manual actions -->
+    <div class="actions hidden" id="manualActions">
+      <button class="primary" id="btnDownloadManual">Download PDF</button>
+    </div>
+
+    <!-- Bulk actions -->
+    <div class="actions hidden" id="massalActions">
+      <button class="secondary" id="btnTambahResi">+ Tambah Resi</button>
+      <button class="primary" id="btnSelesai">Selesai &amp; Download PDF</button>
+    </div>
+
+    <div class="hidden" id="queuePanel">
+      <h2>Antrean Resi</h2>
+      <div id="queueList"></div>
+      <p class="empty-note" id="queueEmptyNote">Belum ada resi ditambahkan.</p>
+    </div>
+  </div>
+
+  <footer>Dibuat untuk pencetakan resi J&amp;T Express &middot; format 100&times;150mm</footer>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  // ---- Konfigurasi default pengirim (diisi otomatis) ----
+  const DEFAULT_HP_PENGIRIM = "+62 819-1100-8025";
+  const DEFAULT_ALAMAT_PENGIRIM = "JAWA BARAT, KOTA DEPOK, SUKMAJAYA, 16412, Perumahan Mutiara Buana, Jalan Lap Member Blok C2, No. C2, Sukmajaya";
+
+  // ---- State ----
+  let mode = null; // 'manual' | 'massal'
+  let resiQueue = [];
+
+  // ---- Elemen ----
+  const modeSelectPanel = document.getElementById('modeSelectPanel');
+  const formPanel = document.getElementById('formPanel');
+  const btnPilihManual = document.getElementById('btnPilihManual');
+  const btnPilihMassal = document.getElementById('btnPilihMassal');
+  const btnGantiMode = document.getElementById('btnGantiMode');
+
+  const namaPenerima = document.getElementById('namaPenerima');
+  const hpPenerima = document.getElementById('hpPenerima');
+  const alamatPenerima = document.getElementById('alamatPenerima');
+  const jumlahPesanan = document.getElementById('jumlahPesanan');
+  const pembayaran = document.getElementById('pembayaran');
+  const namaPengirim = document.getElementById('namaPengirim');
+  const hpPengirim = document.getElementById('hpPengirim');
+  const alamatPengirim = document.getElementById('alamatPengirim');
+  const formError = document.getElementById('formError');
+
+  const manualActions = document.getElementById('manualActions');
+  const massalActions = document.getElementById('massalActions');
+  const btnDownloadManual = document.getElementById('btnDownloadManual');
+  const btnTambahResi = document.getElementById('btnTambahResi');
+  const btnSelesai = document.getElementById('btnSelesai');
+
+  const queuePanel = document.getElementById('queuePanel');
+  const queueList = document.getElementById('queueList');
+  const queueEmptyNote = document.getElementById('queueEmptyNote');
+
+  // ---- Inisialisasi pilihan jumlah pesanan 1..10 ----
+  for(let i=1;i<=10;i++){
+    const opt = document.createElement('option');
+    opt.value = i;
+    opt.textContent = i + (i===1 ? ' pcs' : ' pcs');
+    jumlahPesanan.appendChild(opt);
+  }
+
+  // ---- Isi otomatis data pengirim ----
+  hpPengirim.value = DEFAULT_HP_PENGIRIM;
+  alamatPengirim.value = DEFAULT_ALAMAT_PENGIRIM;
+
+  // ---- Format tanggal hari ini dd/mm/yyyy ----
+  function tanggalHariIni(){
+    const d = new Date();
+    const dd = String(d.getDate()).padStart(2,'0');
+    const mm = String(d.getMonth()+1).padStart(2,'0');
+    const yyyy = d.getFullYear();
+    return `${dd}/${mm}/${yyyy}`;
+  }
+
+  // ---- Navigasi mode ----
+  function pilihMode(m){
+    mode = m;
+    modeSelectPanel.classList.add('hidden');
+    formPanel.classList.remove('hidden');
+    if(m === 'manual'){
+      manualActions.classList.remove('hidden');
+      massalActions.classList.add('hidden');
+      queuePanel.classList.add('hidden');
+    } else {
+      manualActions.classList.add('hidden');
+      massalActions.classList.remove('hidden');
+      queuePanel.classList.remove('hidden');
+      renderQueue();
+    }
+    clearError();
+  }
+
+  btnPilihManual.addEventListener('click', () => pilihMode('manual'));
+  btnPilihMassal.addEventListener('click', () => pilihMode('massal'));
+
+  btnGantiMode.addEventListener('click', () => {
+    mode = null;
+    resiQueue = [];
+    renderQueue();
+    resetForm();
+    formPanel.classList.add('hidden');
+    modeSelectPanel.classList.remove('hidden');
+  });
+
+  // ---- Validasi & ambil data form ----
+  function showError(msg){
+    formError.textContent = msg;
+    formError.classList.remove('hidden');
+  }
+  function clearError(){
+    formError.classList.add('hidden');
+    formError.textContent = '';
+  }
+
+  function ambilDataForm(){
+    const nama = namaPenerima.value.trim();
+    const hp = hpPenerima.value.trim();
+    const alamat = alamatPenerima.value.trim();
+    const pengirim = namaPengirim.value.trim();
+
+    if(!nama){ showError('Nama penerima wajib diisi.'); return null; }
+    if(!hp){ showError('No. HP penerima wajib diisi.'); return null; }
+    if(!alamat){ showError('Alamat lengkap wajib diisi.'); return null; }
+    if(!pengirim){ showError('Nama pengirim wajib diisi.'); return null; }
+
+    clearError();
+    return {
+      namaPenerima: nama,
+      hpPenerima: hp,
+      alamatPenerima: alamat,
+      jumlah: jumlahPesanan.value,
+      pembayaran: pembayaran.value, // 'cod' | 'nonCod'
+      namaPengirim: pengirim,
+      hpPengirim: hpPengirim.value,
+      alamatPengirim: alamatPengirim.value,
+      tanggal: tanggalHariIni()
+    };
+  }
+
+  function resetForm(){
+    namaPenerima.value = '';
+    hpPenerima.value = '';
+    alamatPenerima.value = '';
+    jumlahPesanan.value = '1';
+    pembayaran.value = 'cod';
+    namaPengirim.value = '';
+    hpPengirim.value = DEFAULT_HP_PENGIRIM;
+    alamatPengirim.value = DEFAULT_ALAMAT_PENGIRIM;
+    clearError();
+    namaPenerima.focus();
+  }
+
+  // ---- Antrean (mode massal) ----
+  function renderQueue(){
+    queueList.innerHTML = '';
+    if(resiQueue.length === 0){
+      queueEmptyNote.classList.remove('hidden');
+      return;
+    }
+    queueEmptyNote.classList.add('hidden');
+    resiQueue.forEach((data, idx) => {
+      const item = document.createElement('div');
+      item.className = 'queue-item';
+      item.innerHTML = `
+        <div>
+          <div class="qname">${idx+1}. ${escapeHtml(data.namaPenerima)}</div>
+          <div class="qmeta">${data.jumlah} pcs &middot; ${data.pembayaran === 'cod' ? 'COD' : 'Non COD'}</div>
+        </div>
+      `;
+      const hapusBtn = document.createElement('button');
+      hapusBtn.textContent = 'Hapus';
+      hapusBtn.addEventListener('click', () => {
+        resiQueue.splice(idx,1);
+        renderQueue();
+      });
+      item.appendChild(hapusBtn);
+      queueList.appendChild(item);
+    });
+  }
+
+  function escapeHtml(str){
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
+  btnTambahResi.addEventListener('click', () => {
+    const data = ambilDataForm();
+    if(!data) return;
+    resiQueue.push(data);
+    resetForm();
+    renderQueue();
+  });
+
+  btnSelesai.addEventListener('click', () => {
+    // Jika ada data belum ditambahkan tapi sudah diisi, tanyakan lewat validasi ringan:
+    // hanya proses antrean yang sudah ditambahkan lewat "Tambah Resi".
+    if(resiQueue.length === 0){
+      showError('Belum ada resi di antrean. Klik "Tambah Resi" terlebih dahulu, atau isi minimal satu resi.');
+      return;
+    }
+    generatePdf(resiQueue);
+    resiQueue = [];
+    renderQueue();
+    resetForm();
+  });
+
+  btnDownloadManual.addEventListener('click', () => {
+    const data = ambilDataForm();
+    if(!data) return;
+    generatePdf([data]);
+  });
+
+  // ---- Pembuatan PDF ----
+  function drawResiPage(doc, data, isFirstPage){
+    if(!isFirstPage){
+      doc.addPage([100,150], 'portrait');
+    }
+    const marginX = 6;
+    const pageWidth = 100;
+    const contentWidth = pageWidth - marginX*2;
+    let y = 10;
+
+    // Header
+    doc.setFont('helvetica','bold');
+    doc.setFontSize(12);
+    const labelPembayaran = data.pembayaran === 'cod' ? 'COD' : 'NON COD';
+    doc.text(`J&T EXPRESS ${labelPembayaran}`, marginX, y);
+    y += 3;
+    doc.setLineWidth(0.4);
+    doc.line(marginX, y, pageWidth - marginX, y);
+    y += 6;
+
+    // Penerima
+    doc.setFont('helvetica','bold');
+    doc.setFontSize(8.5);
+    doc.text('PENERIMA', marginX, y);
+    y += 4.5;
+
+    doc.setFont('helvetica','normal');
+    doc.setFontSize(10);
+    doc.text(data.namaPenerima, marginX, y);
+    y += 4.7;
+    doc.text(data.hpPenerima, marginX, y);
+    y += 4.7;
+
+    const alamatLines = doc.splitTextToSize(data.alamatPenerima, contentWidth);
+    doc.text(alamatLines, marginX, y);
+    y += alamatLines.length * 4.4 + 4;
+
+    // Info fields
+    const fields = [
+      ['LAYANAN', 'Regular'],
+      ['PEMBAYARAN', labelPembayaran === 'COD' ? 'COD' : 'Non COD'],
+      ['TANGGAL', data.tanggal],
+      ['EKSPEDISI', 'J&T'],
+      ['JUMLAH', `${data.jumlah} pcs`]
+    ];
+    fields.forEach(([label, val]) => {
+      doc.setFont('helvetica','bold');
+      doc.setFontSize(8.5);
+      doc.text(label, marginX, y);
+      y += 4.2;
+      doc.setFont('helvetica','normal');
+      doc.setFontSize(10);
+      doc.text(String(val), marginX, y);
+      y += 5.2;
+    });
+
+    y += 1.5;
+    doc.setLineWidth(0.2);
+    doc.line(marginX, y, pageWidth - marginX, y);
+    y += 5;
+
+    // Pengirim
+    doc.setFont('helvetica','bold');
+    doc.setFontSize(8.5);
+    doc.text('PENGIRIM', marginX, y);
+    y += 4.5;
+
+    doc.setFont('helvetica','normal');
+    doc.setFontSize(10);
+    doc.text(data.namaPengirim, marginX, y);
+    y += 4.7;
+    doc.text(data.hpPengirim, marginX, y);
+    y += 4.7;
+
+    const alamatPengirimLines = doc.splitTextToSize(data.alamatPengirim, contentWidth);
+    doc.text(alamatPengirimLines, marginX, y);
+    y += alamatPengirimLines.length * 4.4;
+
+    // Footer
+    doc.setFont('helvetica','italic');
+    doc.setFontSize(8);
+    doc.text('J&T EXPRESS \u2014 TERIMA KASIH', marginX, 145);
+  }
+
+  function generatePdf(list){
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ unit: 'mm', format: [100,150], orientation: 'portrait' });
+    list.forEach((data, idx) => {
+      drawResiPage(doc, data, idx === 0);
+    });
+    const fileName = list.length === 1
+      ? `resi_${sanitizeFileName(list[0].namaPenerima)}.pdf`
+      : `resi_${list.length}_pesanan_100x150mm.pdf`;
+    doc.save(fileName);
+  }
+
+  function sanitizeFileName(str){
+    return str.replace(/[^a-z0-9]+/gi, '_').replace(/^_+|_+$/g,'').toLowerCase() || 'resi';
+  }
+
+  // ---- Inisialisasi awal ----
+  resetForm();
+})();
+</script>
+</body>
+</html>
